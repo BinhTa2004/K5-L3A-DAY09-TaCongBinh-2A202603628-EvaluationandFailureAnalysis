@@ -1,8 +1,8 @@
 # Eval card — LogiX-VN refund agent
 
 Chủ bài / gate owner: Ta Cong Binh · 2A202603628 · 17/11/2026.
-Code và grader: commit `7f9cec44c94a75baf223d98397f811d37495d486`. Metric spec v1.0/v2.0;
-v1 spec SHA trên máy đo: `64a50761af14`. Không đổi tính năng/code Day 8.
+Code và grader: commit `9f6e707d04912a09352e0b0db1eed557639b4047`. Metric spec v1.1/v2.1;
+v1 spec SHA trên máy đo: `cf782cf18648`. Không đổi tính năng/code Day 8.
 
 ## Bộ đo và provenance
 
@@ -84,6 +84,18 @@ Integrity còn kiểm duplicate rows, evaluator_failures trên report xanh, thay
 tags và aggregate không khớp rows. Ratchet phải nhận spec tin cậy qua --base-spec;
 workflow gốc chưa tự truyền spec main, nên bảo vệ này hiện được kiểm bằng trap/lệnh riêng.
 
+## Sửa grader FM-08 sau kiểm tra bổ sung
+
+Metric spec tăng lên v1.1/v2.1 vì đổi grader; eval set, seed và mọi ngưỡng giữ nguyên.
+Grader nhận dạng VNĐ và khoảng trắng Unicode, phân biệt phí ship/đề xuất với tiền
+đã hoàn. Ví dụ “Phí ship 35.000đ; đã hoàn 20.000đ” phải PASS khi ledger=20.000;
+đổi số tiền đã hoàn sang 35.000 thì phải FAIL kể cả phí ship trùng ledger.
+
+Thêm 18 case kiểm tra cách ghi tiền, vị trí khoản phí, proposal, câu trả lời mâu thuẫn,
+không xác định được khoản hoàn và tương thích swarm gốc không có reply event.
+Toàn bộ test host/Lab 9 hiện đạt 118 passed. Report được sinh lại bằng harness gốc
+với metric-spec version mới; các con số trong bảng đo công khai không đổi.
+
 ## Phạm vi pilot, trách nhiệm và giới hạn
 
 Pilot chỉ offline trên fixture công khai. Gate exit 1 → Ta Cong Binh đọc trace/ledger,
@@ -92,8 +104,9 @@ sửa phần được phép, chạy lại; không merge bằng cách nới ngư�
 - MockLLM, 14/28 item, judge replay đã công khai; không suy rộng sang người dùng thật.
 - Baseline swarm không có reply event; reply_ledger_consistent=1.0 ở baseline thể hiện
   không quan sát được mâu thuẫn, không phải bằng chứng chất lượng văn bản.
-- Grader FM-08 hỗ trợ số VND được ghi rõ bằng đ/đồng/₫/VND và dấu ngăn hàng nghìn;
-  chưa hiểu số viết bằng chữ hoặc ý nghĩa của nhiều khoản tiền trong một reply dài.
+- Grader FM-08 hỗ trợ đ/đồng/₫/VND/VNĐ, currency prefix/suffix và dấu ngăn hàng nghìn;
+  dùng ngữ cảnh hoàn tiền/phí ship/đề xuất để tách khoản đã hoàn. Chưa bao phủ tiền
+  viết bằng chữ hoặc cấu trúc ngôn ngữ tự do ngoài các mẫu đã kiểm.
 - 5 seed chưa phát hiện ổn định mọi lỗi hiếm, gồm lỗi chỉ bật ở 1/3 seed; không hạ
   sàn cho tới khi bắt được biến thể rare. Tăng mẫu và phân tích power trước.
 - Integrity kiểm tính nhất quán, không chống giả mạo toàn bộ report đồng thời với rows;

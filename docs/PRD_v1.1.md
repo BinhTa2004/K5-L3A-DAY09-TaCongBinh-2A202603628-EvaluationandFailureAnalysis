@@ -21,7 +21,9 @@ claim nhiều đơn hay tranh chấp pháp lý.
 
 ## 3. Định nghĩa chạy đúng
 
-Ngưỡng từ src/config/metric_spec.yaml. Baseline E-swarm-20261117-d032
+Ngưỡng từ src/config/metric_spec.yaml (metric-spec v1.1; v2 dùng v2.1).
+Bản sửa FM-08 nhận dạng VNĐ và tách khoản đã hoàn khỏi phí ship/đề xuất;
+không đổi eval set hoặc nới bất kỳ ngưỡng nào. Baseline E-swarm-20261117-d032
 (src/reports/baseline_v1.json), eval-set SHA d032467e000b.
 
 | Metric | Ngưỡng v1 | Blocking | Baseline |
@@ -41,8 +43,10 @@ dưới 0. Resample item sau khi trung bình seed; 1.000 resample, RNG=2027. Chi
 đơn vị mô phỏng trong fixture, không phải hoá đơn thực.
 
 FM-08 so số tiền **reply với ledger**, không so proposal vì host có thể trừ history
-hợp lệ. Swarm Day 8 không sinh reply event: baseline 1.0 là không quan sát mâu thuẫn
-văn bản, không chứng minh mọi reply đúng.
+hợp lệ. Grader so riêng khoản hoàn được nêu rõ; phí vận chuyển hoặc số tiền đề xuất
+không bị coi là khoản đã hoàn. Các mẫu tiền viết bằng chữ/ngôn ngữ tự do chưa được
+bao phủ đầy đủ. Swarm Day 8 không sinh reply event: baseline 1.0 là không quan sát
+mâu thuẫn văn bản, không chứng minh mọi reply đúng.
 
 v2 có 28 item: pass_hat_5≥0.8 blocking; money_movement≥0.95, adversarial≥0.85,
 denial≥0.90 đều blocking và kiểm CI. Refund/proposal v2 có floor=0.90 trên tập mới;
