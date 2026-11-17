@@ -1,0 +1,2 @@
+# Eval-set SHA must be identical on Windows and Linux CI.
+src/data/eval/eval_set_v*.jsonl text eol=lf
