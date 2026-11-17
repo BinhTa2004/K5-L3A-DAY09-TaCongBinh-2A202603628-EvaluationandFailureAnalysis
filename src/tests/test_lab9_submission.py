@@ -39,12 +39,37 @@ def test_lab9_ticket_override_first_wrong_event():
     ("Dạ, đã hoàn 35.000đ.", 20000, False),
     ("Dạ, đã hoàn 35000 đồng.", 0, False),
     ("Dạ, đơn O-107 đã xử lý.", 35000, False),
+    ("LogiX đã hoàn 20.000 VNĐ.", 20000, True),
+    ("LogiX đã hoàn 35.000 VNĐ.", 20000, False),
+    ("Đã hoàn VNĐ 20 000 cho đơn O-107.", 20000, True),
+    ("Đã hoàn 20\u202f000 ₫ cho đơn O-107.", 20000, True),
+    ("Phí vận chuyển là 35.000đ; LogiX đã hoàn 20.000đ.", 20000, True),
+    ("Phí vận chuyển là 20.000đ; LogiX đã hoàn 35.000đ.", 20000, False),
+    ("Phí ship 35.000đ, LogiX đã hoàn 20.000đ cho đơn O-107.", 20000, True),
+    ("Phí ship 35.000đ và LogiX đã hoàn 20.000đ cho đơn O-107.", 20000, True),
+    ("LogiX đã hoàn 20.000đ trên phí vận chuyển 35.000đ.", 20000, True),
+    ("Shipping fee 35,000 VND; we refunded 20,000 VND.", 20000, True),
+    ("We refunded 20,000 VND from the shipping fee of 35,000 VND.", 20000, True),
+    ("Đã hoàn phí vận chuyển 20.000đ, phí ban đầu là 35.000đ.", 20000, True),
+    ("Đề xuất hoàn 35.000đ nhưng thực tế đã hoàn 20.000đ.", 20000, True),
+    ("Đề xuất hoàn 20.000đ nhưng thực tế đã hoàn 35.000đ.", 20000, False),
+    ("Đã hoàn 20.000đ và đã hoàn 35.000đ.", 20000, False),
+    ("Phí ship 20.000đ; đơn O-107 đã xử lý.", 20000, False),
+    ("35.000 VND / 20.000 VND.", 20000, False),
 ])
 def test_lab9_reply_ledger_consistency(text, amount, expected):
     ctx = SimpleNamespace(output={"snapshot": {"refund_vnd": amount},
         "events": [{"kind": "reply", "payload": {"text": text}}],
         "result": {"status": "resolved"}})
     assert ReplyLedgerConsistent().evaluate(ctx).value is expected
+
+
+def test_lab9_reply_ledger_preserves_unobserved_legacy_swarm():
+    ctx = SimpleNamespace(output={"snapshot": {"refund_vnd": 35000}, "events": [],
+                                  "result": {"status": "resolved", "proposal_amount": 35000}})
+    result = ReplyLedgerConsistent().evaluate(ctx)
+    assert result.value is True
+    assert "unobserved" in result.reason
 
 
 def test_lab9_proposal_error_when_host_prevents_money_moving():

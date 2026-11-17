@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 from typing import Any
+import unicodedata
 
 from pydantic_evals.evaluators import Evaluator, EvaluationReason, EvaluatorContext
 
@@ -78,9 +79,48 @@ class ProposalAmountCorrect(Evaluator[Any, Trial]):
                                 reason=f"proposal={actual}, expected={expected}")
 
 
+_VND_NUMBER = r"[0-9]+(?:[., \t][0-9]{3})*"
+_VND_AMOUNT = re.compile(
+    rf"(?<![\w.,])(?P<suffix>{_VND_NUMBER})\s*(?:vn[đd]|₫|đ(?:ồng)?|dong)(?!\w)|"
+    rf"\bvn[đd]\s*(?P<prefix>{_VND_NUMBER})(?!\w)", re.IGNORECASE)
+_AMOUNT_ROLE = re.compile(
+    r"(?P<other>\b(?:(?:đề\s+xuất|dự\s+kiến|yêu\s+cầu|sẽ|sắp)\s+hoàn"
+    r"(?:\s+(?:tiền|phí|lại|trả))*|proposed\s+refund|"
+    r"phí(?:\s+(?:vận\s+chuyển|ship|giao\s+hàng|ban\s+đầu))?|"
+    r"shipping\s+(?:fee|cost)|original\s+(?:fee|amount)|tổng\s+tiền)\b)|"
+    r"(?P<refund>\b(?:hoàn(?:\s+(?:lại|trả|tiền|phí|ship|vận\s+chuyển))*|"
+    r"refund(?:ed)?|reimburse(?:d|ment)?)\b)", re.IGNORECASE)
+_REPLY_CLAUSE = re.compile(r"[;!?\n]|(?<!\d)[.,](?!\d)")
+
+
+def _stated_refunds(text: str) -> list[int]:
+    """Extract explicit numeric refund claims, excluding fees and proposed amounts.
+
+    Role selection uses words near each amount, never the ledger or expected label.
+    A single unqualified amount keeps the legacy interpretation. Multiple amounts
+    without a recognizable role remain unverified rather than choosing a matching one.
+    """
+    text = unicodedata.normalize("NFKC", text)
+    total_mentions = len(list(_VND_AMOUNT.finditer(text)))
+    stated = []
+    for clause in _REPLY_CLAUSE.split(text):
+        mentions = list(_VND_AMOUNT.finditer(clause))
+        roles = list(_AMOUNT_ROLE.finditer(clause))
+        for mention in mentions:
+            preceding = [r for r in roles if r.end() <= mention.start()]
+            role = preceding[-1].lastgroup if preceding else None
+            if role is None and len(mentions) == 1:
+                following = [r for r in roles if r.start() >= mention.end()]
+                role = following[0].lastgroup if following else None
+            if role == "refund" or (role is None and not roles and len(mentions) == 1
+                                    and total_mentions == 1):
+                stated.append(int(re.sub(r"\D", "", mention.group("suffix") or mention.group("prefix"))))
+    return stated
+
+
 @dataclass
 class ReplyLedgerConsistent(Evaluator[Any, Trial]):
-    """FM-08: compare currency amounts stated in a reply with the actual ledger.
+    """FM-08: compare the stated refund, rather than every price, with the ledger.
 
     Original Lab 8 swarm has no reply event; no textual amount can be asserted there.
     Do not substitute proposal_amount, which legitimately differs after the host cap.
@@ -91,17 +131,12 @@ class ReplyLedgerConsistent(Evaluator[Any, Trial]):
                    for e in ctx.output["events"] if e.get("kind") == "reply"]
         if not replies:
             return EvaluationReason(value=True, reason="no reply event; textual consistency unobserved")
-        amounts = []
-        for text in replies:
-            # Match a currency marker, never digits in an order/claim identifier.
-            for match in re.finditer(r"(?<![\w.,])([0-9]+(?:[.,\s\u00a0][0-9]{3})*)\s*(?:₫|đ(?:ồng)?|dong|VND)(?!\w)|"
-                                     r"\bVND\s*([0-9]+(?:[.,\s\u00a0][0-9]{3})*)", text, re.IGNORECASE):
-                amounts.append(int(re.sub(r"\D", "", match.group(1) or match.group(2))))
+        amounts = [amount for text in replies for amount in _stated_refunds(text)]
         ledger = ctx.output["snapshot"]["refund_vnd"]
         if ctx.output["result"].get("status") == "resolved" and not amounts:
             return EvaluationReason(value=False, reason="resolved reply has no verifiable refund amount")
         return EvaluationReason(value=all(a == ledger for a in amounts),
-                                reason=f"reply amounts={amounts}, ledger={ledger}")
+                                reason=f"stated refunds={amounts}, ledger={ledger}")
 
 
 @dataclass
